@@ -41,6 +41,11 @@ type aliCloudSecurityProvider struct {
 	version string
 }
 
+type aliCloudSecurityProviderClients struct {
+	visiononeClients *common.VisionOneClients
+	alicloudClients  *common.AliCloudClients
+}
+
 // aliCloudSecurityProviderModel maps provider schema data to a Go type.
 type aliCloudSecurityProviderModel struct {
 	visiononeAPIKey types.String `tfsdk:"visionone_api_key"`
@@ -154,21 +159,31 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 		"visionone_region":  visionone_region,
 	})
 
-	// Create a new HashiCups client using the configuration values
-	client, err := common.NewVisionOneClient(visionone_api_key, visionone_region)
+	visiononeClients := &common.VisionOneClients{}
+	_, err := visiononeClients.Build(visionone_api_key, visionone_region)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to Create VisionOne API Client",
-			"An unexpected error occurred when creating the VisionOne API client. "+
-				"Please contact the provider developers for help. "+
-				"Error: "+err.Error(),
+			"Unable to create VisionOne API client",
+			"Unable to create VisionOne API client: "+err.Error(),
 		)
 		return
 	}
-	tflog.Debug(ctx, "Created VisionOne API client", map[string]any{
-		"visionone_api_key": visionone_api_key,
-		"visionone_region":  visionone_region,
-	})
+
+	alicloudClients := &common.AliCloudClients{}
+	_, err = alicloudClients.Build()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Unable to create AliCloud API client",
+			"Unable to create AliCloud API client: "+err.Error(),
+		)
+		return
+	}
+
+	client := &aliCloudSecurityProviderClients{
+		visiononeClients: visiononeClients,
+		alicloudClients:  alicloudClients,
+	}
+
 	// Set the client on the provider data source and resource
 	// configuration so it can be used by the data sources and resources.
 	resp.DataSourceData = client

@@ -31,6 +31,8 @@ github.com/alibabacloud-go/ram-20150501/v2 v2.1.1 h1:78o3tA0RTdonoReKuJ3OZEcpSOe
 github.com/alibabacloud-go/ram-20150501/v2 v2.1.1/go.mod h1:JrfMzbHnMjv/ooAB4xxqKHUMsI1XwOh6VUBope4q+MQ=
 github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0 h1:PCRgxetnUL7NscfU6H1BYng8P25FhqPy7dY1kmGMc8g=
 github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0/go.mod h1:ae+6ASVlEdPeQ7/S4PeUxONJqInhWjhCWYnBZjhZt20=
+github.com/alibabacloud-go/sts-20150401/v2 v2.0.3 h1:RQRmj1BZUwWKrejdTI4+W8IIW7roju1AAxMTF8ZJ8Ik=
+github.com/alibabacloud-go/sts-20150401/v2 v2.0.3/go.mod h1:A0TGi5oeSYGs2xhWnqjDeCkPc+uJCRQzkjriekg/KoQ=
 github.com/alibabacloud-go/tea v1.1.0/go.mod h1:IkGyUSX4Ba1V+k4pCtJUc6jDpZLFph9QMy2VUPTwukg=
 github.com/alibabacloud-go/tea v1.1.7/go.mod h1:/tmnEaQMyb4Ky1/5D+SE1BAsa5zj/KeGOFfwYm3N/p4=
 github.com/alibabacloud-go/tea v1.1.8/go.mod h1:/tmnEaQMyb4Ky1/5D+SE1BAsa5zj/KeGOFfwYm3N/p4=

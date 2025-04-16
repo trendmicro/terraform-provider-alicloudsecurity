@@ -6,6 +6,7 @@ require (
 	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.6
 	github.com/alibabacloud-go/ram-20150501/v2 v2.1.1
 	github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0
+	github.com/alibabacloud-go/sts-20150401/v2 v2.0.3
 	github.com/alibabacloud-go/tea v1.3.6
 	github.com/hashicorp/terraform-plugin-framework v1.14.1
 	github.com/hashicorp/terraform-plugin-go v0.26.0

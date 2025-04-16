@@ -3,13 +3,11 @@ package provider
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"terraform-provider-alicloudsecurity/internal/common"
 
-	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	ram "github.com/alibabacloud-go/ram-20150501/v2/client"
-	"github.com/alibabacloud-go/tea/tea"
+	sts "github.com/alibabacloud-go/sts-20150401/v2/client"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -27,8 +25,9 @@ func NewVisiononeAlicloudAccountConnectionResource() resource.Resource {
 
 // visiononeAlicloudAccountConnectionResource is the resource implementation.
 type visiononeAlicloudAccountConnectionResource struct {
-	v1Client  *common.VisionOneClient
-	ramClient *ram.Client
+	cam *common.CamClient
+	sts *sts.Client
+	ram *ram.Client
 }
 
 // visiononeAlicloudAccountConnectionResourceModel maps the resource schema.
@@ -79,26 +78,18 @@ func (r *visiononeAlicloudAccountConnectionResource) Configure(ctx context.Conte
 		return
 	}
 
-	client, ok := req.ProviderData.(*common.VisionOneClient)
+	clients, ok := req.ProviderData.(*aliCloudSecurityProviderClients)
 	if !ok {
 		resp.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			"Expected *VisionOneClient, got something else",
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *aliCloudSecurityProviderClients, got %T.", req.ProviderData),
 		)
 		return
 	}
-	err := client.HealthCheck()
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error configuring VisionOne client",
-			fmt.Sprintf("Error configuring VisionOne client: %s", err.Error()),
-		)
-		return
-	}
-
 	// Set the client
-	r.v1Client = client
-	tflog.Info(ctx, "VisionOne client configured successfully")
+	r.cam = clients.visiononeClients.Cam
+	r.sts = clients.alicloudClients.Sts
+	r.ram = clients.alicloudClients.Ram
 }
 
 // Create creates the resource.
@@ -195,45 +186,4 @@ func (r *visiononeAlicloudAccountConnectionResource) Delete(ctx context.Context,
 
 	// Get the values from state parameters, and request vision-one-cam backend to delete the record
 	panic("vision-one-cam backend is not implemented yet")
-}
-
-func (r *visiononeAlicloudAccountConnectionResource) GetRamClientInstance(
-	ctx context.Context,
-) (*ram.Client, error) {
-	if r.ramClient != nil {
-		return r.ramClient, nil
-	}
-
-	// Obtain the key/secret/region from the environment variables
-	alicloudAccessKey := os.Getenv("ALICLOUD_ACCESS_KEY")
-	alicloudAccessSecret := os.Getenv("ALICLOUD_ACCESS_SECRET")
-	alicloudRegion := os.Getenv("ALICLOUD_REGION")
-	if alicloudAccessKey == "" || alicloudAccessSecret == "" || alicloudRegion == "" {
-		return nil, fmt.Errorf("ALICLOUD_ACCESS_KEY, ALICLOUD_ACCESS_SECRET, and ALICLOUD_REGION environment variables must be set")
-	}
-
-	// configure the shared configuration
-	config := &openapi.Config{
-		AccessKeyId:     tea.String(alicloudAccessKey),
-		AccessKeySecret: tea.String(alicloudAccessSecret),
-		RegionId:        tea.String(alicloudRegion),
-	}
-	// Initialize RAM client
-	config.Endpoint = tea.String("ram.aliyuncs.com")
-	tflog.Info(ctx, "Creating Alicloud Resource Access Management client", map[string]any{
-		"config": config,
-	})
-	client, err := ram.NewClient(config)
-	if err != nil {
-		return nil, err
-	}
-	// Check if the client is not nil and can be used
-	if client == nil {
-		return nil, fmt.Errorf("failed to create RAM client")
-	} else {
-		tflog.Info(ctx, "Alicloud Resource Access Management client created successfully")
-	}
-
-	r.ramClient = client
-	return r.ramClient, nil
 }
