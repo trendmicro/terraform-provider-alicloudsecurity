@@ -194,9 +194,7 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 
 // DataSources defines the data sources implemented in the provider.
 func (p *aliCloudSecurityProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
-		NewVisiononeAlicloudAccountDataSource,
-	}
+	return []func() datasource.DataSource{}
 }
 
 // Resources defines the resources implemented in the provider.

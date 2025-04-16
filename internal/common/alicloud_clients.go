@@ -34,11 +34,45 @@ func (a *AliCloudClients) Build() (*AliCloudClients, error) {
 	if _, err := a.BuildRamClient(context.Background(), ""); err != nil {
 		return nil, err
 	}
+
+	if err := a.verifyConfig(); err != nil {
+		return nil, err
+	}
+
+	tflog.Info(context.Background(), "AliCloud clients created successfully")
 	return a, nil
 }
 
-func (a *AliCloudClients) BuildStsClient(
-	ctx context.Context, region string) (*sts.Client, error) {
+// Use sts client to verify the configuration
+func (a *AliCloudClients) verifyConfig() error {
+	var accountId string
+
+	if a.Sts == nil {
+		return fmt.Errorf("STS client is not initialized")
+	}
+
+	resp, err := a.Sts.GetCallerIdentity()
+	if err != nil {
+		return fmt.Errorf("failed to get caller identity: %v", err)
+	}
+	if resp == nil {
+		return fmt.Errorf("failed to get caller identity: response is nil")
+	} else {
+		accountId = tea.StringValue(resp.Body.AccountId)
+	}
+
+	if accountId == "" {
+		return fmt.Errorf("failed to get account ID: response is empty")
+	} else {
+		tflog.Info(context.Background(), "STS client configuration verified successfully", map[string]any{
+			"accountId": accountId,
+		})
+	}
+
+	return nil
+}
+
+func (a *AliCloudClients) BuildStsClient(ctx context.Context, region string) (*sts.Client, error) {
 	if a.Sts != nil {
 		return a.Sts, nil
 	}
