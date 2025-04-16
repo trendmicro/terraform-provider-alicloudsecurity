@@ -7,10 +7,9 @@ import (
 	"context"
 	"flag"
 	"log"
+	"terraform-provider-alicloudsecurity/internal/provider"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-
-	"terraform-provider-hashicups/internal/provider"
 )
 
 var (

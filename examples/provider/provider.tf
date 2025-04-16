@@ -1,6 +1,5 @@
 # Configuration-based authentication
-provider "hashicups" {
-  username = "education"
-  password = "test123"
-  host     = "http://localhost:19090"
+provider "alicloudsecurity" {
+  visionone_api_key = "your_api_key_here"
+  visionone_region = "your_region_here"
 }
