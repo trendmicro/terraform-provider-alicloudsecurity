@@ -6,8 +6,8 @@ package provider
 import (
 	"context"
 	"os"
+	"terraform-provider-alicloudsecurity/internal/common"
 
-	"github.com/hashicorp-demoapp/hashicups-client-go"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -20,41 +20,41 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ provider.Provider              = &visiononeAliCloudSecurityProvider{}
-	_ provider.ProviderWithFunctions = &visiononeAliCloudSecurityProvider{}
+	_ provider.Provider              = &aliCloudSecurityProvider{}
+	_ provider.ProviderWithFunctions = &aliCloudSecurityProvider{}
 )
 
 // New is a helper function to simplify provider server and testing implementation.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
-		return &visiononeAliCloudSecurityProvider{
+		return &aliCloudSecurityProvider{
 			version: version,
 		}
 	}
 }
 
-// visiononeAliCloudSecurityProvider is the provider implementation.
-type visiononeAliCloudSecurityProvider struct {
+// aliCloudSecurityProvider is the provider implementation.
+type aliCloudSecurityProvider struct {
 	// version is set to the provider version on release, "dev" when the
 	// provider is built and ran locally, and "test" when running acceptance
 	// testing.
 	version string
 }
 
-// visiononeAliCloudSecurityProviderModel maps provider schema data to a Go type.
-type visiononeAliCloudSecurityProviderModel struct {
+// aliCloudSecurityProviderModel maps provider schema data to a Go type.
+type aliCloudSecurityProviderModel struct {
 	visiononeAPIKey types.String `tfsdk:"visionone_api_key"`
 	visiononeRegion types.String `tfsdk:"visionone_region"`
 }
 
 // Metadata returns the provider type name.
-func (p *visiononeAliCloudSecurityProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "visionone_alicloud_security"
+func (p *aliCloudSecurityProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
+	resp.TypeName = "alicloudsecurity"
 	resp.Version = p.version
 }
 
 // Schema defines the provider-level schema for configuration data.
-func (p *visiononeAliCloudSecurityProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *aliCloudSecurityProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Interact with VisionOne AliCloud Security.",
 		Attributes: map[string]schema.Attribute{
@@ -71,11 +71,11 @@ func (p *visiononeAliCloudSecurityProvider) Schema(_ context.Context, _ provider
 }
 
 // Configure prepares a VisionOne AliCloud Security API client for data sources and resources.
-func (p *visiononeAliCloudSecurityProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
+func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	tflog.Info(ctx, "Configuring VisionOne AliCloud Security client")
 
 	// Retrieve provider data from configuration
-	var config visiononeAliCloudSecurityProviderModel
+	var config aliCloudSecurityProviderModel
 	diags := req.Config.Get(ctx, &config)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -155,43 +155,42 @@ func (p *visiononeAliCloudSecurityProvider) Configure(ctx context.Context, req p
 	})
 
 	// Create a new HashiCups client using the configuration values
-	client, err := hashicups.NewClient(&host, &username, &password)
+	client, err := common.NewVisionOneClient(visionone_api_key, visionone_region)
 	if err != nil {
 		resp.Diagnostics.AddError(
-			"Unable to Create HashiCups API Client",
-			"An unexpected error occurred when creating the HashiCups API client. "+
-				"If the error is not clear, please contact the provider developers.\n\n"+
-				"HashiCups Client Error: "+err.Error(),
+			"Unable to Create VisionOne API Client",
+			"An unexpected error occurred when creating the VisionOne API client. "+
+				"Please contact the provider developers for help. "+
+				"Error: "+err.Error(),
 		)
 		return
 	}
-
-	// Make the HashiCups client available during DataSource and Resource
-	// type Configure methods.
+	tflog.Debug(ctx, "Created VisionOne API client", map[string]any{
+		"visionone_api_key": visionone_api_key,
+		"visionone_region":  visionone_region,
+	})
+	// Set the client on the provider data source and resource
+	// configuration so it can be used by the data sources and resources.
 	resp.DataSourceData = client
 	resp.ResourceData = client
 
-	tflog.Info(ctx, "Configured HashiCups client", map[string]any{"success": true})
+	tflog.Info(ctx, "Configured VisionOne API client", map[string]any{"success": true})
 }
 
 // DataSources defines the data sources implemented in the provider.
-func (p *hashicupsProvider) DataSources(_ context.Context) []func() datasource.DataSource {
+func (p *aliCloudSecurityProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewCoffeesDataSource,
 		NewVisiononeAlicloudAccountDataSource,
 	}
 }
 
 // Resources defines the resources implemented in the provider.
-func (p *hashicupsProvider) Resources(_ context.Context) []func() resource.Resource {
+func (p *aliCloudSecurityProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewOrderResource,
 		NewVisiononeAlicloudAccountConnectionResource,
 	}
 }
 
-func (p *hashicupsProvider) Functions(_ context.Context) []func() function.Function {
-	return []func() function.Function{
-		NewComputeTaxFunction,
-	}
+func (p *aliCloudSecurityProvider) Functions(_ context.Context) []func() function.Function {
+	return []func() function.Function{}
 }

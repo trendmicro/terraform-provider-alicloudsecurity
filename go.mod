@@ -1,4 +1,4 @@
-module terraform-provider-hashicups
+module terraform-provider-alicloudsecurity
 
 go 1.23.7
 
@@ -7,7 +7,6 @@ require (
 	github.com/alibabacloud-go/ram-20150501/v2 v2.1.1
 	github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0
 	github.com/alibabacloud-go/tea v1.3.6
-	github.com/hashicorp-demoapp/hashicups-client-go v0.1.0
 	github.com/hashicorp/terraform-plugin-framework v1.14.1
 	github.com/hashicorp/terraform-plugin-go v0.26.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0

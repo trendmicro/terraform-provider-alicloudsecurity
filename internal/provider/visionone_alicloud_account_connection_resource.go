@@ -2,6 +2,10 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"os"
+
+	"terraform-provider-alicloudsecurity/internal/common"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	ram "github.com/alibabacloud-go/ram-20150501/v2/client"
@@ -23,18 +27,16 @@ func NewVisiononeAlicloudAccountConnectionResource() resource.Resource {
 
 // visiononeAlicloudAccountConnectionResource is the resource implementation.
 type visiononeAlicloudAccountConnectionResource struct {
+	v1Client  *common.VisionOneClient
 	ramClient *ram.Client
 }
 
 // visiononeAlicloudAccountConnectionResourceModel maps the resource schema.
 type visiononeAlicloudAccountConnectionResourceModel struct {
-	RoleId               types.String `tfsdk:"role_id"`
-	RoleName             types.String `tfsdk:"role_name"`
-	RoleArn              types.String `tfsdk:"role_arn"`
-	RoleDescription      types.String `tfsdk:"role_description"`
-	AlicloudAccessKey    types.String `tfsdk:"alicloud_accesskey"`
-	AlicloudAccessSecret types.String `tfsdk:"alicloud_accesskey_secret"`
-	AlicloudRegion       types.String `tfsdk:"alicloud_region"`
+	RoleId          types.String `tfsdk:"role_id"`
+	RoleName        types.String `tfsdk:"role_name"`
+	RoleArn         types.String `tfsdk:"role_arn"`
+	RoleDescription types.String `tfsdk:"role_description"`
 }
 
 // Metadata returns the resource type name.
@@ -63,23 +65,40 @@ func (r *visiononeAlicloudAccountConnectionResource) Schema(_ context.Context, _
 				Description: "The description of the role.",
 				Optional:    true,
 			},
-			"alicloud_accesskey": schema.StringAttribute{
-				Description: "The Alicloud Access Key.",
-				Required:    true,
-				Sensitive:   true,
-			},
-			"alicloud_accesskey_secret": schema.StringAttribute{
-				Description: "The Alicloud Access Key Secret.",
-				Required:    true,
-				Sensitive:   true,
-			},
-			"alicloud_region": schema.StringAttribute{
-				Description: "The Alicloud region.",
-				Optional:    true,
-				Computed:    true,
-			},
 		},
 	}
+}
+
+// Configure adds the provider configured client to the resource.
+func (r *visiononeAlicloudAccountConnectionResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	tflog.Info(ctx, "Configuring resource...")
+
+	// Add a nil check when handling ProviderData because Terraform
+	// sets that data after it calls the ConfigureProvider RPC.
+	if req.ProviderData == nil {
+		return
+	}
+
+	client, ok := req.ProviderData.(*common.VisionOneClient)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			"Expected *VisionOneClient, got something else",
+		)
+		return
+	}
+	err := client.HealthCheck()
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error configuring VisionOne client",
+			fmt.Sprintf("Error configuring VisionOne client: %s", err.Error()),
+		)
+		return
+	}
+
+	// Set the client
+	r.v1Client = client
+	tflog.Info(ctx, "VisionOne client configured successfully")
 }
 
 // Create creates the resource.
@@ -94,40 +113,12 @@ func (r *visiononeAlicloudAccountConnectionResource) Create(ctx context.Context,
 		return
 	}
 
-	ramClient, err := r.GetRamClientInstance(ctx, plan.AlicloudAccessKey.ValueString(), plan.AlicloudAccessSecret.ValueString(), plan.AlicloudRegion.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Error getting RAM client", err.Error())
-		return
-	}
-
-	// Create the resource in Alicloud
-	createRoleRequest := &ram.CreateRoleRequest{
-		RoleName: tea.String(plan.RoleName.ValueString()),
-		AssumeRolePolicyDocument: tea.String(`{
-	"Statement": [{
-		"Action": "sts:AssumeRole",
-		"Effect": "Allow",
-		"Principal": {
-			"Service": [
-				"ecs.aliyuncs.com"
-			]
-		}
-	}],
-	"Version": "1"
-}`),
-		Description: tea.String(plan.RoleDescription.ValueString()),
-	}
-	createRoleResponse, err := ramClient.CreateRole(createRoleRequest)
-	if err != nil {
-		resp.Diagnostics.AddError("Error creating role", err.Error())
-		return
-	}
-
 	// Map response body to schema and populate Computed attribute values
-	plan.RoleId = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.RoleId))
-	plan.RoleArn = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.Arn))
-	plan.RoleName = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.RoleName))
-	plan.RoleDescription = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.Description))
+	// plan.RoleId = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.RoleId))
+	// plan.RoleArn = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.Arn))
+	// plan.RoleName = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.RoleName))
+	// plan.RoleDescription = types.StringValue(tea.StringValue(createRoleResponse.Body.Role.Description))
+
 	// Set state to fully populated plan
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
@@ -146,25 +137,15 @@ func (r *visiononeAlicloudAccountConnectionResource) Read(ctx context.Context, r
 		return
 	}
 
-	ramClient, err := r.GetRamClientInstance(ctx, state.AlicloudAccessKey.ValueString(), state.AlicloudAccessSecret.ValueString(), state.AlicloudRegion.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Error getting RAM client", err.Error())
-		return
-	}
-	// Fetch the role details
-	roleDetailsRequest := &ram.GetRoleRequest{
-		RoleName: tea.String(state.RoleName.ValueString()),
-	}
-	roleDetailsResponse, err := ramClient.GetRole(roleDetailsRequest)
-	if err != nil {
-		resp.Diagnostics.AddError("Error fetching role details", err.Error())
-		return
-	}
+	// Get the values from plan parameters, and connect to vision-one-cam backend
+	panic("vision-one-cam backend is not implemented yet")
+
 	// Overwrite items with refreshed state
-	state.RoleId = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.RoleId))
-	state.RoleArn = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.Arn))
-	state.RoleName = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.RoleName))
-	state.RoleDescription = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.Description))
+	// state.RoleId = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.RoleId))
+	// state.RoleArn = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.Arn))
+	// state.RoleName = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.RoleName))
+	// state.RoleDescription = types.StringValue(tea.StringValue(roleDetailsResponse.Body.Role.Description))
+
 	// Set the state
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -184,27 +165,16 @@ func (r *visiononeAlicloudAccountConnectionResource) Update(ctx context.Context,
 		return
 	}
 
-	ramClient, err := r.GetRamClientInstance(ctx, plan.AlicloudAccessKey.ValueString(), plan.AlicloudAccessSecret.ValueString(), plan.AlicloudRegion.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Error getting RAM client", err.Error())
-		return
-	}
-	// Update the role name
-	updateRoleRequest := &ram.UpdateRoleRequest{
-		RoleName:       tea.String(plan.RoleName.ValueString()),
-		NewDescription: tea.String(plan.RoleDescription.ValueString()),
-	}
-	updateRoleResponse, err := ramClient.UpdateRole(updateRoleRequest)
-	if err != nil {
-		resp.Diagnostics.AddError("Error updating role", err.Error())
-		return
-	}
+	// Get the values from plan parameters, and update to vision-one-cam backend
+	panic("vision-one-cam backend is not implemented yet")
 
-	plan.RoleId = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.RoleId))
-	plan.RoleArn = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.Arn))
-	plan.RoleName = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.RoleName))
-	plan.RoleDescription = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.Description))
+	// Set the values to plan
+	// plan.RoleId = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.RoleId))
+	// plan.RoleArn = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.Arn))
+	// plan.RoleName = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.RoleName))
+	// plan.RoleDescription = types.StringValue(tea.StringValue(updateRoleResponse.Body.Role.Description))
 
+	// Set the state
 	diags = resp.State.Set(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -223,34 +193,25 @@ func (r *visiononeAlicloudAccountConnectionResource) Delete(ctx context.Context,
 		return
 	}
 
-	ramClient, err := r.GetRamClientInstance(ctx, state.AlicloudAccessKey.ValueString(), state.AlicloudAccessSecret.ValueString(), state.AlicloudRegion.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Error getting RAM client", err.Error())
-		return
-	}
-	// Delete the role
-	deleteRoleRequest := &ram.DeleteRoleRequest{
-		RoleName: tea.String(state.RoleName.ValueString()),
-	}
-	deleteRoleResponse, err := ramClient.DeleteRole(deleteRoleRequest)
-	if err != nil {
-		resp.Diagnostics.AddError("Error deleting role", err.Error())
-		return
-	}
-	tflog.Info(ctx, "Role deleted successfully", map[string]any{
-		"deletion_request_id": deleteRoleResponse.Body.RequestId,
-	})
+	// Get the values from state parameters, and request vision-one-cam backend to delete the record
+	panic("vision-one-cam backend is not implemented yet")
 }
 
 func (r *visiononeAlicloudAccountConnectionResource) GetRamClientInstance(
 	ctx context.Context,
-	alicloudAccessKey string,
-	alicloudAccessSecret string,
-	alicloudRegion string,
 ) (*ram.Client, error) {
 	if r.ramClient != nil {
 		return r.ramClient, nil
 	}
+
+	// Obtain the key/secret/region from the environment variables
+	alicloudAccessKey := os.Getenv("ALICLOUD_ACCESS_KEY")
+	alicloudAccessSecret := os.Getenv("ALICLOUD_ACCESS_SECRET")
+	alicloudRegion := os.Getenv("ALICLOUD_REGION")
+	if alicloudAccessKey == "" || alicloudAccessSecret == "" || alicloudRegion == "" {
+		return nil, fmt.Errorf("ALICLOUD_ACCESS_KEY, ALICLOUD_ACCESS_SECRET, and ALICLOUD_REGION environment variables must be set")
+	}
+
 	// configure the shared configuration
 	config := &openapi.Config{
 		AccessKeyId:     tea.String(alicloudAccessKey),
@@ -266,6 +227,13 @@ func (r *visiononeAlicloudAccountConnectionResource) GetRamClientInstance(
 	if err != nil {
 		return nil, err
 	}
+	// Check if the client is not nil and can be used
+	if client == nil {
+		return nil, fmt.Errorf("failed to create RAM client")
+	} else {
+		tflog.Info(ctx, "Alicloud Resource Access Management client created successfully")
+	}
+
 	r.ramClient = client
 	return r.ramClient, nil
 }
