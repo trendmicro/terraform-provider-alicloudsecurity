@@ -48,8 +48,8 @@ type aliCloudSecurityProviderClients struct {
 
 // aliCloudSecurityProviderModel maps provider schema data to a Go type.
 type aliCloudSecurityProviderModel struct {
-	visiononeAPIKey types.String `tfsdk:"visionone_api_key"`
-	visiononeRegion types.String `tfsdk:"visionone_region"`
+	VisiononeAPIKey types.String `tfsdk:"visionone_api_key"`
+	VisiononeRegion types.String `tfsdk:"visionone_region"`
 }
 
 // Metadata returns the provider type name.
@@ -89,7 +89,7 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 
 	// If practitioner provided a configuration value for any of the
 	// attributes, it must be a known value.
-	if config.visiononeAPIKey.IsUnknown() {
+	if config.VisiononeAPIKey.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("visionone_api_key"),
 			"Unknown VisionOne API Key",
@@ -98,7 +98,7 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 		)
 	}
 
-	if config.visiononeRegion.IsUnknown() {
+	if config.VisiononeRegion.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("visionone_region"),
 			"Unknown VisionOne Region",
@@ -116,12 +116,12 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 	visionone_api_key := os.Getenv("VISIONONE_API_KEY")
 	visionone_region := os.Getenv("VISIONONE_REGION")
 
-	if !config.visiononeAPIKey.IsNull() {
-		visionone_api_key = config.visiononeAPIKey.ValueString()
+	if !config.VisiononeAPIKey.IsNull() {
+		visionone_api_key = config.VisiononeAPIKey.ValueString()
 	}
 
-	if !config.visiononeRegion.IsNull() {
-		visionone_region = config.visiononeRegion.ValueString()
+	if !config.VisiononeRegion.IsNull() {
+		visionone_region = config.VisiononeRegion.ValueString()
 	}
 
 	// If any of the expected configurations are missing, return
@@ -179,28 +179,34 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 		return
 	}
 
-	client := &aliCloudSecurityProviderClients{
+	clients := &aliCloudSecurityProviderClients{
 		visiononeClients: visiononeClients,
 		alicloudClients:  alicloudClients,
 	}
 
 	// Set the client on the provider data source and resource
 	// configuration so it can be used by the data sources and resources.
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	resp.DataSourceData = clients
+	resp.ResourceData = clients
 
 	tflog.Info(ctx, "Configured VisionOne API client", map[string]any{"success": true})
 }
 
 // DataSources defines the data sources implemented in the provider.
 func (p *aliCloudSecurityProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewConnectedAccountSource, // temporary data source for test
+
+		// unpublished data sources
+		// NewRamRoleSource,
+	}
 }
 
 // Resources defines the resources implemented in the provider.
 func (p *aliCloudSecurityProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewVisiononeAlicloudAccountConnectionResource,
+		// unpublished resources
+		// NewVisiononeAlicloudAccountConnectionResource,
 	}
 }
 
