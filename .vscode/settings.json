@@ -1,6 +1,3 @@
 {
-  "yaml.schemas": {
-    ".vscode/compose-spec.json": "docker-compose.yml"
-  },
   "cSpell.enabled": false
 }
