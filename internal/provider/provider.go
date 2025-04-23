@@ -48,8 +48,11 @@ type aliCloudSecurityProviderClients struct {
 
 // aliCloudSecurityProviderModel maps provider schema data to a Go type.
 type aliCloudSecurityProviderModel struct {
-	VisiononeAPIKey types.String `tfsdk:"visionone_api_key"`
-	VisiononeRegion types.String `tfsdk:"visionone_region"`
+	VisiononeEndpoint     types.String `tfsdk:"visionone_endpoint"`
+	VisiononeEndpointType types.String `tfsdk:"visionone_endpoint_type"`
+	VisiononeBusinessId   types.String `tfsdk:"visionone_business_id"`
+	VisiononeAPIKey       types.String `tfsdk:"visionone_api_key"`
+	VisiononeRegion       types.String `tfsdk:"visionone_region"`
 }
 
 // Metadata returns the provider type name.
@@ -63,6 +66,18 @@ func (p *aliCloudSecurityProvider) Schema(_ context.Context, _ provider.SchemaRe
 	resp.Schema = schema.Schema{
 		Description: "Interact with VisionOne AliCloud Security.",
 		Attributes: map[string]schema.Attribute{
+			"visionone_endpoint": schema.StringAttribute{
+				Description: "Endpoint for VisionOne AliCloud Security. May also be provided via VISIONONE_ENDPOINT environment variable.",
+				Optional:    true,
+			},
+			"visionone_endpoint_type": schema.StringAttribute{
+				Description: "Endpoint type for VisionOne AliCloud Security. May also be provided via VISIONONE_ENDPOINT_TYPE environment variable.",
+				Optional:    true,
+			},
+			"visionone_business_id": schema.StringAttribute{
+				Description: "Bussiness Id for VisionOne AliCloud Security. May also be provided via VISIONONE_BUSINESS_ID environment variable.",
+				Optional:    true,
+			},
 			"visionone_api_key": schema.StringAttribute{
 				Description: "API key for VisionOne AliCloud Security. May also be provided via VISIONONE_API_KEY environment variable.",
 				Optional:    true,
@@ -89,6 +104,33 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 
 	// If practitioner provided a configuration value for any of the
 	// attributes, it must be a known value.
+	if config.VisiononeEndpoint.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("visionone_endpoint"),
+			"Unknown VisionOne Endpoint",
+			"The provider cannot create the VisionOne API client as there is an unknown configuration value for the VisionOne endpoint. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the VISIONONE_ENDPOINT environment variable.",
+		)
+	}
+
+	if config.VisiononeEndpointType.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("visionone_endpoint_type"),
+			"Unknown VisionOne Endpoint Type",
+			"The provider cannot create the VisionOne API client as there is an unknown configuration value for the VisionOne endpoint type. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the VISIONONE_ENDPOINT_TYPE environment variable.",
+		)
+	}
+
+	if config.VisiononeBusinessId.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("visionone_business_id"),
+			"Unknown VisionOne Business Id",
+			"The provider cannot create the VisionOne API client as there is an unknown configuration value for the VisionOne business id. "+
+				"Either target apply the source of the value first, set the value statically in the configuration, or use the VISIONONE_BUSINESS_ID environment variable.",
+		)
+	}
+
 	if config.VisiononeAPIKey.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("visionone_api_key"),
@@ -113,8 +155,23 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 
 	// Default values to environment variables, but override
 	// with Terraform configuration value if set.
+	visionone_endpoint := os.Getenv("VISIONONE_ENDPOINT")
+	visionone_endpoint_type := os.Getenv("VISIONONE_ENDPOINT_TYPE")
+	visionone_business_id := os.Getenv("VISIONONE_BUSINESS_ID")
 	visionone_api_key := os.Getenv("VISIONONE_API_KEY")
 	visionone_region := os.Getenv("VISIONONE_REGION")
+
+	if !config.VisiononeEndpoint.IsNull() {
+		visionone_endpoint = config.VisiononeEndpoint.ValueString()
+	}
+
+	if !config.VisiononeEndpointType.IsNull() {
+		visionone_endpoint_type = config.VisiononeEndpointType.ValueString()
+	}
+
+	if !config.VisiononeBusinessId.IsNull() {
+		visionone_business_id = config.VisiononeBusinessId.ValueString()
+	}
 
 	if !config.VisiononeAPIKey.IsNull() {
 		visionone_api_key = config.VisiononeAPIKey.ValueString()
@@ -126,6 +183,36 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 
 	// If any of the expected configurations are missing, return
 	// errors with provider-specific guidance.
+	if visionone_endpoint == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("visionone_endpoint"),
+			"Missing VisionOne Endpoint",
+			"The provider cannot create the VisionOne API client as there is a missing or empty value for the VisionOne endpoint. "+
+				"Set the visionone_endpoint value in the configuration or use the VISIONONE_ENDPOINT environment variable. "+
+				"If either is already set, ensure the value is not empty.",
+		)
+	}
+
+	if visionone_endpoint_type == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("visionone_endpoint_type"),
+			"Missing VisionOne Endpoint Type",
+			"The provider cannot create the VisionOne API client as there is a missing or empty value for the VisionOne endpoint type. "+
+				"Set the visionone_endpoint_type value in the configuration or use the VISIONONE_ENDPOINT_TYPE environment variable. "+
+				"If either is already set, ensure the value is not empty.",
+		)
+	}
+
+	if visionone_business_id == "" {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("visionone_business_id"),
+			"Missing VisionOne Business Id",
+			"The provider cannot create the VisionOne API client as there is a missing or empty value for the VisionOne business id. "+
+				"Set the visionone_business_id value in the configuration or use the VISIONONE_BUSINESS_ID environment variable. "+
+				"If either is already set, ensure the value is not empty.",
+		)
+	}
+
 	if visionone_api_key == "" {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("visionone_api_key"),
@@ -150,17 +237,23 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 		return
 	}
 
+	ctx = tflog.SetField(ctx, "visionone_endpoint", visionone_endpoint_type)
+	ctx = tflog.SetField(ctx, "visionone_endpoint_type", visionone_endpoint_type)
+	ctx = tflog.SetField(ctx, "visionone_business_id", visionone_business_id)
 	ctx = tflog.SetField(ctx, "visionone_api_key", visionone_api_key)
 	ctx = tflog.SetField(ctx, "visionone_region", visionone_region)
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "visionone_api_key")
 
 	tflog.Debug(ctx, "Creating VisionOne API client", map[string]any{
-		"visionone_api_key": visionone_api_key,
-		"visionone_region":  visionone_region,
+		"visionone_endpoint":      visionone_endpoint,
+		"visionone_endpoint_type": visionone_endpoint_type,
+		"visionone_business_id":   visionone_business_id,
+		"visionone_api_key":       visionone_api_key,
+		"visionone_region":        visionone_region,
 	})
 
 	visiononeClients := &common.VisionOneClients{}
-	_, err := visiononeClients.Build(visionone_api_key, visionone_region)
+	_, err := visiononeClients.Build(visionone_endpoint, visionone_endpoint_type, visionone_business_id, visionone_api_key, visionone_region)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to create VisionOne API client",
