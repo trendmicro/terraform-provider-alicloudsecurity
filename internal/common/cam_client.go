@@ -1,68 +1,213 @@
 package common
 
-// This file contains the implementation of the VisionOne client.
-// It's a http client that interacts with the VisionOne API.
-// The client required the API key and region to be set.
-// According to the region, the client will set different base URL.
-// here is the mapping
-// au: api.au.xdr.trendmicro.com (Australia)
-// eu: api.eu.xdr.trendmicro.com (European Union)
-// in: api.in.xdr.trendmicro.com (India)
-// jp: api.xdr.trendmicro.co.jp (Japan)
-// sg: api.sg.xdr.trendmicro.com (Singapore)
-// uae: api.mea.xdr.trendmicro.com (United Arab Emirates)
-// us: api.xdr.trendmicro.com (United States)
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/google/uuid"
 )
 
 type CamClient struct {
-	ApiKey     string
-	Region     string
-	BaseURL    string
-	HttpClient *http.Client
+	Config *CamClientConfig
+	Client *http.Client
 }
 
-var regionBaseURLMap = map[string]string{
-	"au":  "https://api.au.xdr.trendmicro.com",
-	"eu":  "https://api.eu.xdr.trendmicro.com",
-	"in":  "https://api.in.xdr.trendmicro.com",
-	"jp":  "https://api.xdr.trendmicro.co.jp",
-	"sg":  "https://api.sg.xdr.trendmicro.com",
-	"uae": "https://api.mea.xdr.trendmicro.com",
-	"us":  "https://api.xdr.trendmicro.com",
+type CamClientConfig struct {
+	Endpoint     *string
+	EndpointType *string
+	Region       *string
+	ApiKey       *string
+	BusinessId   *string
+}
+
+type CreateConnectionRequest struct {
+	AlibabaRegion  *string `json:"alibabaRegion"`  // The region of the Terraform backend where the state files are stored.
+	RoleArn        *string `json:"roleArn"`        // The Alibaba Cloud resource name (ARN) of the user role for Trend Vision One.
+	OidcProviderId *string `json:"oidcProviderId"` // The ID of the Alibaba Cloud OpenID Connect (OIDC) provider.
+	Name           *string `json:"name"`           // The name of the Alibaba Cloud account to be used in Cloud Account Management.
+	Description    *string `json:"description"`    // The description of the Alibaba Cloud account.
+}
+
+type UpdateConnectionRequest struct {
+	Name        *string `json:"name"`        // The name of the Alibaba Cloud account to be used in Cloud Account Management.
+	Description *string `json:"description"` // The description of the Alibaba Cloud account. The default value is an empty string if the field is omitted.
+}
+
+type ReadConnectionResponse struct {
+	Id                 *string `json:"id"`                 // The ID of the Alibaba Cloud account.
+	ParentStackRegion  *string `json:"parentStackRegion"`  // The region of Terraform backend where the state files are stored.
+	RoleArn            *string `json:"roleArn"`            // The Alibaba Cloud resource name (ARN) of the user role for Trend Vision One.
+	OidcProviderId     *string `json:"oidcProviderId"`     // The ID of the Alibaba Cloud OpenID Connect (OIDC) provider.
+	Name               *string `json:"name"`               // The name of the Alibaba Cloud account used in Cloud Account Management.
+	Description        *string `json:"description"`        // The description of the Alibaba Cloud account.
+	CreatedDateTime    *string `json:"createdDateTime"`    // The timestamp indicating when the Alibaba Cloud account was added to Trend Vision One.
+	UpdatedDateTime    *string `json:"updatedDateTime"`    // The timestamp indicating the last time the Alibaba Cloud account was modified.
+	State              *string `json:"state"`              // The status of the Alibaba Cloud account.
+	LastSyncedDateTime *string `json:"lastSyncedDateTime"` // The timestamp indicating the most recent synchronization of the Alibaba Cloud account with the cloud provider.
+}
+
+var apiPathMap = map[string]map[string]string{
+	"create": {
+		"automation": "/v3.0/cam/alibabaAccounts",
+		"express":    "/alibabaAccounts",
+	},
+	"update": {
+		"automation": "/v3.0/cam/alibabaAccounts/%s",
+		"express":    "/alibabaAccounts/%s",
+	},
+	"delete": {
+		"automation": "/v3.0/cam/alibabaAccounts/%s",
+		"express":    "/alibabaAccounts/%s",
+	},
+	"read": {
+		"automation": "/v3.0/cam/alibabaAccounts/%s",
+		"express":    "/alibabaAccounts/%s",
+	},
 }
 
 // NewCamClient creates a new CamClient instance.
-func NewCamClient(apiKey, region string) (*CamClient, error) {
-	baseURL, exists := regionBaseURLMap[region]
-	if !exists {
-		return nil, fmt.Errorf("unsupported region: %s", region)
+func NewCamClient(config *CamClientConfig) (*CamClient, error) {
+	// Ensure the config is not nil
+	if config == nil {
+		return nil, fmt.Errorf("config cannot be nil")
 	}
 
+	// Validate that all required fields in the config are not nil or empty
+	if config.Endpoint == nil || *config.Endpoint == "" {
+		return nil, fmt.Errorf("endpoint cannot be nil or empty")
+	}
+	if config.ApiKey == nil || *config.ApiKey == "" {
+		return nil, fmt.Errorf("API key cannot be nil or empty")
+	}
+	if config.Region == nil || *config.Region == "" {
+		return nil, fmt.Errorf("region cannot be nil or empty")
+	}
+
+	// Create an HTTP client with the Authorization header
+	client := &http.Client{}
+
+	// Create and return the CamClient instance
 	return &CamClient{
-		ApiKey:     apiKey,
-		Region:     region,
-		BaseURL:    baseURL,
-		HttpClient: &http.Client{},
+		Config: config,
+		Client: client,
 	}, nil
 }
 
 // DoRequest performs an HTTP request to the VisionOne API.
-func (c *CamClient) DoRequest(endpoint string, method string, body []byte) (*http.Response, error) {
-	req, err := http.NewRequest(method, fmt.Sprintf("%s%s", c.BaseURL, endpoint), nil)
+func (c *CamClient) DoRequest(method, url string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.ApiKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", *c.Config.ApiKey))
+	req.Header.Set("x-customer-id", *c.Config.BusinessId)
+	req.Header.Set("x-task-id", GenerateUUID())
+	req.Header.Set("x-trace-id", GenerateUUID())
 	req.Header.Set("Content-Type", "application/json")
 
-	return c.HttpClient.Do(req)
+	return c.Client.Do(req)
 }
 
-// A health check to make sure the client is working
-func (c *CamClient) HealthCheck() error {
-	panic("implement me")
+func (c *CamClient) CreateConnection(req *CreateConnectionRequest) error {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	urlPattern, err := BuildUrlPattern(c.Config, "create")
+	if err != nil {
+		return err
+	}
+	url := urlPattern
+
+	_, err = c.DoRequest("POST", url, body)
+	return err
+}
+
+func (c *CamClient) UpdateConnection(accountId *string, req *UpdateConnectionRequest) error {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+
+	urlPattern, err := BuildUrlPattern(c.Config, "update")
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf(urlPattern, *accountId)
+
+	_, err = c.DoRequest(http.MethodPatch, url, body)
+	return err
+}
+
+func (c *CamClient) DeleteConnection(accountId *string) error {
+	if len(*accountId) == 0 {
+		return fmt.Errorf("account id cannot be empty")
+	}
+
+	urlPattern, err := BuildUrlPattern(c.Config, "delete")
+	if err != nil {
+		return err
+	}
+	url := fmt.Sprintf(urlPattern, *accountId)
+
+	_, err = c.DoRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+func (c *CamClient) ReadConnection(accountId *string) (*ReadConnectionResponse, error) {
+	if len(*accountId) == 0 {
+		return nil, fmt.Errorf("account id cannot be empty")
+	}
+
+	urlPattern, err := BuildUrlPattern(c.Config, "delete")
+	if err != nil {
+		return nil, err
+	}
+	url := fmt.Sprintf(urlPattern, *accountId)
+
+	resp, err := c.DoRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to read connection: status code %d", resp.StatusCode)
+	}
+
+	var response ReadConnectionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+	return &response, nil
+
+}
+
+func BuildUrlPattern(c *CamClientConfig, method string) (string, error) {
+	pattern := ""
+
+	if len(*c.EndpointType) == 0 {
+		return "", fmt.Errorf("endpoint type cannot be missing or empty")
+	}
+
+	if m, ok := apiPathMap[method]; ok {
+		if path, ok := m[*c.EndpointType]; ok && path != "" {
+			pattern = fmt.Sprintf("%s%s", *c.Endpoint, path)
+		} else {
+			return "", fmt.Errorf("path is missing or empty. method: %s, endpoint type: %s", method, *c.EndpointType)
+		}
+	} else {
+		return "", fmt.Errorf("unrecognized endpoint type")
+	}
+
+	return pattern, nil
+}
+
+// GenerateUUID generates a new UUID string.
+func GenerateUUID() string {
+	return uuid.New().String()
 }
