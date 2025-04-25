@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -22,20 +23,32 @@ type connectedAccountSource struct {
 	cam *common.CamClient
 }
 
+type connectedAccountSourceModel struct {
+	AccountId      types.String `tfsdk:"account_id"`       // The ID of the AliCloud Account.
+	RoleArn        types.String `tfsdk:"role_arn"`         // The ARN of the role in AliCloud Account. *required*
+	OidcProviderId types.String `tfsdk:"oidc_provider_id"` // The ID of the OIDC provider in AliCloud Account. *required*
+	Name           types.String `tfsdk:"name"`             // The name of the connected account in VisionOne. *required*
+	Description    types.String `tfsdk:"description"`      // The description of the connected account in VisionOne
+
+	ConnectionState types.String `tfsdk:"connection_state"`  // The state of the connected account in VisionOne
+	CreatedDateTime types.String `tfsdk:"created_date_time"` // The creation time of the connected account in VisionOne
+	UpdatedDateTime types.String `tfsdk:"updated_date_time"` // The last update time of the connected account in VisionOne
+}
+
 func (c *connectedAccountSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_connected_account"
 }
 
 func (c *connectedAccountSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		// Description: "Data source for connected account in VisionOne.",
-		// Attributes: map[string]schema.Attribute{
-		// 	"id": schema.StringAttribute{
-		// 		Description: "The ID of the AliCloud Account.",
-		// 		Required:    true,
-		// 		Computed:    false,
-		// 	},
-		// },
+		Description: "Data source for connected account in VisionOne.",
+		Attributes: map[string]schema.Attribute{
+			"account_id": schema.StringAttribute{
+				Description: "The ID of the connected AliCloud Account.",
+				Required:    true,
+				Computed:    false,
+			},
+		},
 	}
 }
 
@@ -57,5 +70,54 @@ func (c *connectedAccountSource) Configure(ctx context.Context, req datasource.C
 }
 
 func (c *connectedAccountSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	panic("not implemented")
+	// based on the schema, we need to get the account_id from the request
+	var data connectedAccountSourceModel
+	diags := req.Config.Get(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	// check if the account_id is set
+	if data.AccountId.IsNull() || data.AccountId.IsUnknown() {
+		resp.Diagnostics.AddError(
+			"Account ID is required",
+			"Account ID cannot be null or unknown.",
+		)
+		return
+	}
+
+	// Read the connected account from the API
+	readConnectionResp, err := c.cam.ReadConnection(data.AccountId.ValueStringPointer())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"API Error",
+			"Unable to read connected account: "+err.Error(),
+		)
+		return
+	}
+	// Check if the response is empty
+	if readConnectionResp == nil {
+		resp.Diagnostics.AddError(
+			"Read Error",
+			"Cannot find connected account with ID: "+data.AccountId.ValueString(),
+		)
+		return
+	} else {
+		// Map the response to the model
+		data.AccountId = types.StringValue(*readConnectionResp.Id)
+		data.RoleArn = types.StringValue(*readConnectionResp.RoleArn)
+		data.OidcProviderId = types.StringValue(*readConnectionResp.OidcProviderId)
+		data.Name = types.StringValue(*readConnectionResp.Name)
+		data.Description = types.StringValue(*readConnectionResp.Description)
+		data.ConnectionState = types.StringValue(*readConnectionResp.State)
+		data.CreatedDateTime = types.StringValue(*readConnectionResp.CreatedDateTime)
+		data.UpdatedDateTime = types.StringValue(*readConnectionResp.UpdatedDateTime)
+	}
+
+	// set the state
+	diags = resp.State.Set(ctx, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 }
