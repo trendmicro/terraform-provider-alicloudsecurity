@@ -289,17 +289,13 @@ func (p *aliCloudSecurityProvider) Configure(ctx context.Context, req provider.C
 func (p *aliCloudSecurityProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewConnectedAccountSource, // temporary data source for test
-
-		// unpublished data sources
-		// NewRamRoleSource,
 	}
 }
 
 // Resources defines the resources implemented in the provider.
 func (p *aliCloudSecurityProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		// unpublished resources
-		// NewVisiononeAlicloudAccountConnectionResource,
+		NewConnectedAccountResource,
 	}
 }
 
