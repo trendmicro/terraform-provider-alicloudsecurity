@@ -49,20 +49,20 @@ type ReadConnectionResponse struct {
 
 var apiPathMap = map[string]map[string]string{
 	"create": {
-		"automation": "/v3.0/cam/alibabaAccounts",
-		"express":    "/alibabaAccounts",
+		"automation": "/v3.0/cam/alibabaAccounts",          // The endpoint would be like: https://api-int.visionone.trendmicro.com
+		"express":    "/public/cam/api/ui/alibabaAccounts", // The endpoint would be like: https://cloudaccounts-dev-us.visionone.trendmicro.com
 	},
 	"update": {
 		"automation": "/v3.0/cam/alibabaAccounts/%s",
-		"express":    "/alibabaAccounts/%s",
+		"express":    "/public/cam/api/ui/alibabaAccounts/%s",
 	},
 	"delete": {
 		"automation": "/v3.0/cam/alibabaAccounts/%s",
-		"express":    "/alibabaAccounts/%s",
+		"express":    "/public/cam/api/ui/alibabaAccounts/%s",
 	},
 	"read": {
 		"automation": "/v3.0/cam/alibabaAccounts/%s",
-		"express":    "/alibabaAccounts/%s",
+		"express":    "/public/cam/api/ui/alibabaAccounts/%s",
 	},
 }
 
