@@ -138,38 +138,16 @@ func (c *connectedAccountSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	}
 	// Check if the response is empty
-	if readConnectionResp == nil {
-		resp.Diagnostics.AddError(
-			"Read Error",
-			"Cannot find connected account with ID: "+data.AccountId.ValueString(),
-		)
-		return
-	} else {
+	if readConnectionResp != nil {
 		// Map the response to the model
-		if readConnectionResp.Id != nil {
-			data.AccountId = types.StringValue(*readConnectionResp.Id)
-		}
-		if readConnectionResp.RoleArn != nil {
-			data.RoleArn = types.StringValue(*readConnectionResp.RoleArn)
-		}
-		if readConnectionResp.OidcProviderId != nil {
-			data.OidcProviderId = types.StringValue(*readConnectionResp.OidcProviderId)
-		}
-		if readConnectionResp.Name != nil {
-			data.Name = types.StringValue(*readConnectionResp.Name)
-		}
-		if readConnectionResp.Description != nil {
-			data.Description = types.StringValue(*readConnectionResp.Description)
-		}
-		if readConnectionResp.State != nil {
-			data.ConnectionState = types.StringValue(*readConnectionResp.State)
-		}
-		if readConnectionResp.CreatedDateTime != nil {
-			data.CreatedDateTime = types.StringValue(*readConnectionResp.CreatedDateTime)
-		}
-		if readConnectionResp.UpdatedDateTime != nil {
-			data.UpdatedDateTime = types.StringValue(*readConnectionResp.UpdatedDateTime)
-		}
+		data.AccountId = types.StringValue(*readConnectionResp.Id)
+		data.RoleArn = types.StringValue(*readConnectionResp.RoleArn)
+		data.OidcProviderId = types.StringValue(*readConnectionResp.OidcProviderId)
+		data.Name = types.StringValue(*readConnectionResp.Name)
+		data.Description = types.StringValue(*readConnectionResp.Description)
+		data.ConnectionState = types.StringValue(*readConnectionResp.State)
+		data.CreatedDateTime = types.StringValue(*readConnectionResp.CreatedDateTime)
+		data.UpdatedDateTime = types.StringValue(*readConnectionResp.UpdatedDateTime)
 	}
 
 	// set the state

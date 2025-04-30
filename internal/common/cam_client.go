@@ -1,9 +1,11 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -24,11 +26,12 @@ type CamClientConfig struct {
 }
 
 type CreateConnectionRequest struct {
-	AlibabaRegion  *string `json:"alibabaRegion"`  // The region of the Terraform backend where the state files are stored.
-	RoleArn        *string `json:"roleArn"`        // The Alibaba Cloud resource name (ARN) of the user role for Trend Vision One.
-	OidcProviderId *string `json:"oidcProviderId"` // The ID of the Alibaba Cloud OpenID Connect (OIDC) provider.
-	Name           *string `json:"name"`           // The name of the Alibaba Cloud account to be used in Cloud Account Management.
-	Description    *string `json:"description"`    // The description of the Alibaba Cloud account.
+	AccountId      *string `json:"accountId" validate:"max=16"`
+	Region         *string `json:"region" validate:"max=254"`
+	RoleArn        *string `json:"roleArn" validate:"max=254"`
+	OidcProviderId *string `json:"oidcProviderId" validate:"max=254"`
+	Name           *string `json:"name" validate:"max=254"`
+	Description    *string `json:"description" validate:"omitempty,max=254"`
 }
 
 type UpdateConnectionRequest struct {
@@ -97,8 +100,9 @@ func NewCamClient(config *CamClientConfig) (*CamClient, error) {
 }
 
 // DoRequest performs an HTTP request to the VisionOne API.
-func (c *CamClient) DoRequest(method, url string, body []byte) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, nil)
+func (c *CamClient) DoRequest(ctx context.Context, method, url string, body []byte) (*http.Response, error) {
+	bodyReader := bytes.NewReader(body)
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return nil, err
 	}
@@ -127,19 +131,25 @@ func (c *CamClient) CreateConnection(ctx context.Context, req *CreateConnectionR
 	tflog.Debug(ctx, fmt.Sprintf("CreateConnection URL: %s", url))
 	tflog.Debug(ctx, fmt.Sprintf("CreateConnection Request: %s", string(body)))
 
-	resp, err := c.DoRequest("POST", url, body)
+	resp, err := c.DoRequest(ctx, "POST", url, body)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode >= 300 {
 		// Read the response body to get more details about the error
-		respBody, err := json.Marshal(resp.Body)
+		respBodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("failed to read response body: %v", err)
 		}
-		return fmt.Errorf("failed to create connection: status code %d, response: %s", resp.StatusCode, string(respBody))
+
+		var respBody map[string]interface{}
+		if err := json.Unmarshal(respBodyBytes, &respBody); err != nil {
+			return fmt.Errorf("failed to unmarshal response body: %v", err)
+		} else {
+			return fmt.Errorf("failed to create connection: status code %d, response: %s", resp.StatusCode, string(respBodyBytes))
+		}
 	}
 
 	return nil
@@ -160,7 +170,7 @@ func (c *CamClient) UpdateConnection(ctx context.Context, accountId *string, req
 	tflog.Debug(ctx, fmt.Sprintf("UpdateConnection URL: %s", url))
 	tflog.Debug(ctx, fmt.Sprintf("UpdateConnection Request: %s", string(body)))
 
-	resp, err := c.DoRequest(http.MethodPatch, url, body)
+	resp, err := c.DoRequest(ctx, http.MethodPatch, url, body)
 	if err != nil {
 		return err
 	}
@@ -185,7 +195,7 @@ func (c *CamClient) DeleteConnection(ctx context.Context, accountId *string) err
 	tflog.Debug(ctx, fmt.Sprintf("DeleteConnection URL: %s", url))
 	tflog.Debug(ctx, fmt.Sprintf("DeleteConnection Account ID: %s", *accountId))
 
-	resp, err := c.DoRequest(http.MethodDelete, url, nil)
+	resp, err := c.DoRequest(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -209,22 +219,72 @@ func (c *CamClient) ReadConnection(ctx context.Context, accountId *string) (*Rea
 	tflog.Debug(ctx, fmt.Sprintf("ReadConnection URL: %s", url))
 	tflog.Debug(ctx, fmt.Sprintf("ReadConnection Account ID: %s", *accountId))
 
-	resp, err := c.DoRequest(http.MethodGet, url, nil)
+	resp, err := c.DoRequest(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to read connection: status code %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusNotFound {
+			// Handle the case where the account is not found, return empty response or nil
+			tflog.Debug(ctx, fmt.Sprintf("ReadConnection: account %s not found", *accountId))
+			return nil, nil
+		} else {
+			return nil, fmt.Errorf("failed to read connection: status code %d", resp.StatusCode)
+		}
 	}
 
 	response := &ReadConnectionResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
-	return response, nil
 
+	if response == nil {
+		return nil, fmt.Errorf("response is nil")
+	} else {
+		if response.Id == nil {
+			response.Id = new(string)
+			*response.Id = ""
+		}
+		if response.ParentStackRegion == nil {
+			response.ParentStackRegion = new(string)
+			*response.ParentStackRegion = ""
+		}
+		if response.RoleArn == nil {
+			response.RoleArn = new(string)
+			*response.RoleArn = ""
+		}
+		if response.OidcProviderId == nil {
+			response.OidcProviderId = new(string)
+			*response.OidcProviderId = ""
+		}
+		if response.Name == nil {
+			response.Name = new(string)
+			*response.Name = ""
+		}
+		if response.Description == nil {
+			response.Description = new(string)
+			*response.Description = ""
+		}
+		if response.CreatedDateTime == nil {
+			response.CreatedDateTime = new(string)
+			*response.CreatedDateTime = ""
+		}
+		if response.UpdatedDateTime == nil {
+			response.UpdatedDateTime = new(string)
+			*response.UpdatedDateTime = ""
+		}
+		if response.State == nil {
+			response.State = new(string)
+			*response.State = ""
+		}
+		if response.LastSyncedDateTime == nil {
+			response.LastSyncedDateTime = new(string)
+			*response.LastSyncedDateTime = ""
+		}
+	}
+	return response, nil
 }
 
 func BuildUrlPattern(c *CamClientConfig, method string) (string, error) {

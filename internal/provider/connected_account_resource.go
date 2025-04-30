@@ -126,7 +126,8 @@ func (r *connectedAccountResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	createConnectionReq := &common.CreateConnectionRequest{
-		AlibabaRegion:  plan.StackStateRegion.ValueStringPointer(),
+		AccountId:      plan.AccountId.ValueStringPointer(),
+		Region:         plan.StackStateRegion.ValueStringPointer(),
 		RoleArn:        plan.RoleArn.ValueStringPointer(),
 		OidcProviderId: plan.OidcProviderId.ValueStringPointer(),
 		Name:           plan.Name.ValueStringPointer(),
@@ -150,13 +151,7 @@ func (r *connectedAccountResource) Create(ctx context.Context, req resource.Crea
 		)
 		return
 	}
-	if readConnectionResp == nil {
-		resp.Diagnostics.AddError(
-			"Read Connection Error",
-			"Failed to read connection: response is nil",
-		)
-		return
-	} else {
+	if readConnectionResp != nil {
 		// Overwrite the plan with the read response
 		plan.AccountId = types.StringValue(*readConnectionResp.Id)
 		plan.StackStateRegion = types.StringValue(*readConnectionResp.ParentStackRegion)
