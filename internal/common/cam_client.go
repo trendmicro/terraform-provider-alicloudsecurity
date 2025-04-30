@@ -1,11 +1,13 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 type CamClient struct {
@@ -110,7 +112,7 @@ func (c *CamClient) DoRequest(method, url string, body []byte) (*http.Response, 
 	return c.Client.Do(req)
 }
 
-func (c *CamClient) CreateConnection(req *CreateConnectionRequest) error {
+func (c *CamClient) CreateConnection(ctx context.Context, req *CreateConnectionRequest) error {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return err
@@ -122,11 +124,28 @@ func (c *CamClient) CreateConnection(req *CreateConnectionRequest) error {
 	}
 	url := urlPattern
 
-	_, err = c.DoRequest("POST", url, body)
-	return err
+	tflog.Debug(ctx, fmt.Sprintf("CreateConnection URL: %s", url))
+	tflog.Debug(ctx, fmt.Sprintf("CreateConnection Request: %s", string(body)))
+
+	resp, err := c.DoRequest("POST", url, body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		// Read the response body to get more details about the error
+		respBody, err := json.Marshal(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %v", err)
+		}
+		return fmt.Errorf("failed to create connection: status code %d, response: %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
 }
 
-func (c *CamClient) UpdateConnection(accountId *string, req *UpdateConnectionRequest) error {
+func (c *CamClient) UpdateConnection(ctx context.Context, accountId *string, req *UpdateConnectionRequest) error {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return err
@@ -138,11 +157,21 @@ func (c *CamClient) UpdateConnection(accountId *string, req *UpdateConnectionReq
 	}
 	url := fmt.Sprintf(urlPattern, *accountId)
 
-	_, err = c.DoRequest(http.MethodPatch, url, body)
-	return err
+	tflog.Debug(ctx, fmt.Sprintf("UpdateConnection URL: %s", url))
+	tflog.Debug(ctx, fmt.Sprintf("UpdateConnection Request: %s", string(body)))
+
+	resp, err := c.DoRequest(http.MethodPatch, url, body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to update connection: status code %d", resp.StatusCode)
+	}
+	return nil
 }
 
-func (c *CamClient) DeleteConnection(accountId *string) error {
+func (c *CamClient) DeleteConnection(ctx context.Context, accountId *string) error {
 	if len(*accountId) == 0 {
 		return fmt.Errorf("account id cannot be empty")
 	}
@@ -153,11 +182,20 @@ func (c *CamClient) DeleteConnection(accountId *string) error {
 	}
 	url := fmt.Sprintf(urlPattern, *accountId)
 
-	_, err = c.DoRequest(http.MethodDelete, url, nil)
-	return err
+	tflog.Debug(ctx, fmt.Sprintf("DeleteConnection URL: %s", url))
+	tflog.Debug(ctx, fmt.Sprintf("DeleteConnection Account ID: %s", *accountId))
+
+	resp, err := c.DoRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to delete connection: status code %d", resp.StatusCode)
+	}
+	return nil
 }
 
-func (c *CamClient) ReadConnection(accountId *string) (*ReadConnectionResponse, error) {
+func (c *CamClient) ReadConnection(ctx context.Context, accountId *string) (*ReadConnectionResponse, error) {
 	if len(*accountId) == 0 {
 		return nil, fmt.Errorf("account id cannot be empty")
 	}
@@ -167,6 +205,9 @@ func (c *CamClient) ReadConnection(accountId *string) (*ReadConnectionResponse, 
 		return nil, err
 	}
 	url := fmt.Sprintf(urlPattern, *accountId)
+
+	tflog.Debug(ctx, fmt.Sprintf("ReadConnection URL: %s", url))
+	tflog.Debug(ctx, fmt.Sprintf("ReadConnection Account ID: %s", *accountId))
 
 	resp, err := c.DoRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -178,12 +219,11 @@ func (c *CamClient) ReadConnection(accountId *string) (*ReadConnectionResponse, 
 		return nil, fmt.Errorf("failed to read connection: status code %d", resp.StatusCode)
 	}
 
-	var response ReadConnectionResponse
+	response := &ReadConnectionResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
-
-	return &response, nil
+	return response, nil
 
 }
 

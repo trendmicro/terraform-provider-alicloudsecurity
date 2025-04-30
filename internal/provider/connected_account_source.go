@@ -48,6 +48,48 @@ func (c *connectedAccountSource) Schema(_ context.Context, _ datasource.SchemaRe
 				Required:    true,
 				Computed:    false,
 			},
+			"role_arn": schema.StringAttribute{
+				Description: "The ARN of the role in AliCloud Account.",
+				Required:    false,
+				Optional:    false,
+				Computed:    true,
+			},
+			"oidc_provider_id": schema.StringAttribute{
+				Description: "The ID of the OIDC provider in AliCloud Account.",
+				Required:    false,
+				Optional:    false,
+				Computed:    true,
+			},
+			"name": schema.StringAttribute{
+				Description: "The name of the connected account in VisionOne.",
+				Required:    false,
+				Optional:    false,
+				Computed:    true,
+			},
+			"description": schema.StringAttribute{
+				Description: "The description of the connected account in VisionOne.",
+				Required:    false,
+				Optional:    false,
+				Computed:    true,
+			},
+			"connection_state": schema.StringAttribute{
+				Description: "The state of the connected account in VisionOne.",
+				Required:    false,
+				Optional:    false,
+				Computed:    true,
+			},
+			"created_date_time": schema.StringAttribute{
+				Description: "The creation time of the connected account in VisionOne.",
+				Required:    false,
+				Optional:    false,
+				Computed:    true,
+			},
+			"updated_date_time": schema.StringAttribute{
+				Description: "The last update time of the connected account in VisionOne.",
+				Required:    false,
+				Optional:    false,
+				Computed:    true,
+			},
 		},
 	}
 }
@@ -87,7 +129,7 @@ func (c *connectedAccountSource) Read(ctx context.Context, req datasource.ReadRe
 	}
 
 	// Read the connected account from the API
-	readConnectionResp, err := c.cam.ReadConnection(data.AccountId.ValueStringPointer())
+	readConnectionResp, err := c.cam.ReadConnection(ctx, data.AccountId.ValueStringPointer())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"API Error",
@@ -104,14 +146,30 @@ func (c *connectedAccountSource) Read(ctx context.Context, req datasource.ReadRe
 		return
 	} else {
 		// Map the response to the model
-		data.AccountId = types.StringValue(*readConnectionResp.Id)
-		data.RoleArn = types.StringValue(*readConnectionResp.RoleArn)
-		data.OidcProviderId = types.StringValue(*readConnectionResp.OidcProviderId)
-		data.Name = types.StringValue(*readConnectionResp.Name)
-		data.Description = types.StringValue(*readConnectionResp.Description)
-		data.ConnectionState = types.StringValue(*readConnectionResp.State)
-		data.CreatedDateTime = types.StringValue(*readConnectionResp.CreatedDateTime)
-		data.UpdatedDateTime = types.StringValue(*readConnectionResp.UpdatedDateTime)
+		if readConnectionResp.Id != nil {
+			data.AccountId = types.StringValue(*readConnectionResp.Id)
+		}
+		if readConnectionResp.RoleArn != nil {
+			data.RoleArn = types.StringValue(*readConnectionResp.RoleArn)
+		}
+		if readConnectionResp.OidcProviderId != nil {
+			data.OidcProviderId = types.StringValue(*readConnectionResp.OidcProviderId)
+		}
+		if readConnectionResp.Name != nil {
+			data.Name = types.StringValue(*readConnectionResp.Name)
+		}
+		if readConnectionResp.Description != nil {
+			data.Description = types.StringValue(*readConnectionResp.Description)
+		}
+		if readConnectionResp.State != nil {
+			data.ConnectionState = types.StringValue(*readConnectionResp.State)
+		}
+		if readConnectionResp.CreatedDateTime != nil {
+			data.CreatedDateTime = types.StringValue(*readConnectionResp.CreatedDateTime)
+		}
+		if readConnectionResp.UpdatedDateTime != nil {
+			data.UpdatedDateTime = types.StringValue(*readConnectionResp.UpdatedDateTime)
+		}
 	}
 
 	// set the state

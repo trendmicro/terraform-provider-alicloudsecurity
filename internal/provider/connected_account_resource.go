@@ -132,7 +132,7 @@ func (r *connectedAccountResource) Create(ctx context.Context, req resource.Crea
 		Name:           plan.Name.ValueStringPointer(),
 		Description:    plan.Description.ValueStringPointer(),
 	}
-	err := r.cam.CreateConnection(createConnectionReq)
+	err := r.cam.CreateConnection(ctx, createConnectionReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Create Connection Error",
@@ -142,7 +142,7 @@ func (r *connectedAccountResource) Create(ctx context.Context, req resource.Crea
 	}
 
 	readConnectionResp := &common.ReadConnectionResponse{}
-	readConnectionResp, err = r.cam.ReadConnection(plan.AccountId.ValueStringPointer())
+	readConnectionResp, err = r.cam.ReadConnection(ctx, plan.AccountId.ValueStringPointer())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Read Connection Error",
@@ -188,7 +188,7 @@ func (r *connectedAccountResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	// Get refreshed data from the API
-	readConnectionResp, err := r.cam.ReadConnection(state.AccountId.ValueStringPointer())
+	readConnectionResp, err := r.cam.ReadConnection(ctx, state.AccountId.ValueStringPointer())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Read Connection Error",
@@ -238,7 +238,7 @@ func (r *connectedAccountResource) Update(ctx context.Context, req resource.Upda
 		Name:        plan.Name.ValueStringPointer(),
 		Description: plan.Description.ValueStringPointer(),
 	}
-	err := r.cam.UpdateConnection(plan.AccountId.ValueStringPointer(), updateConnectionReq)
+	err := r.cam.UpdateConnection(ctx, plan.AccountId.ValueStringPointer(), updateConnectionReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Update Connection Error",
@@ -248,7 +248,7 @@ func (r *connectedAccountResource) Update(ctx context.Context, req resource.Upda
 	}
 
 	// Read the updated connection
-	readConnectionResp, err := r.cam.ReadConnection(plan.AccountId.ValueStringPointer())
+	readConnectionResp, err := r.cam.ReadConnection(ctx, plan.AccountId.ValueStringPointer())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Read Connection Error",
@@ -294,7 +294,7 @@ func (r *connectedAccountResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	// Delete the connection
-	err := r.cam.DeleteConnection(state.AccountId.ValueStringPointer())
+	err := r.cam.DeleteConnection(ctx, state.AccountId.ValueStringPointer())
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Delete Connection Error",
