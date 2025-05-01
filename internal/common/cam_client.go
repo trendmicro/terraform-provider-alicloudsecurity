@@ -175,8 +175,18 @@ func (c *CamClient) UpdateConnection(ctx context.Context, accountId *string, req
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to update connection: status code %d", resp.StatusCode)
+	if resp.StatusCode >= 300 {
+		// Read the response body to get more details about the error
+		respBodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %v", err)
+		}
+		var respBody map[string]interface{}
+		if err := json.Unmarshal(respBodyBytes, &respBody); err != nil {
+			return fmt.Errorf("failed to unmarshal response body: %v", err)
+		} else {
+			return fmt.Errorf("failed to update connection: status code %d, response: %s", resp.StatusCode, string(respBodyBytes))
+		}
 	}
 	return nil
 }
@@ -199,8 +209,18 @@ func (c *CamClient) DeleteConnection(ctx context.Context, accountId *string) err
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to delete connection: status code %d", resp.StatusCode)
+	if resp.StatusCode >= 300 {
+		// Read the response body to get more details about the error
+		respBodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %v", err)
+		}
+		var respBody map[string]interface{}
+		if err := json.Unmarshal(respBodyBytes, &respBody); err != nil {
+			return fmt.Errorf("failed to unmarshal response body: %v", err)
+		} else {
+			return fmt.Errorf("failed to delete connection: status code %d, response: %s", resp.StatusCode, string(respBodyBytes))
+		}
 	}
 	return nil
 }
@@ -210,7 +230,7 @@ func (c *CamClient) ReadConnection(ctx context.Context, accountId *string) (*Rea
 		return nil, fmt.Errorf("account id cannot be empty")
 	}
 
-	urlPattern, err := BuildUrlPattern(c.Config, "delete")
+	urlPattern, err := BuildUrlPattern(c.Config, "read")
 	if err != nil {
 		return nil, err
 	}
@@ -225,13 +245,23 @@ func (c *CamClient) ReadConnection(ctx context.Context, accountId *string) (*Rea
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode >= 300 {
 		if resp.StatusCode == http.StatusNotFound {
 			// Handle the case where the account is not found, return empty response or nil
 			tflog.Debug(ctx, fmt.Sprintf("ReadConnection: account %s not found", *accountId))
 			return nil, nil
 		} else {
-			return nil, fmt.Errorf("failed to read connection: status code %d", resp.StatusCode)
+			// Read the response body to get more details about the error
+			respBodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read response body: %v", err)
+			}
+			var respBody map[string]interface{}
+			if err := json.Unmarshal(respBodyBytes, &respBody); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal response body: %v", err)
+			} else {
+				return nil, fmt.Errorf("failed to read connection: status code %d, response: %s", resp.StatusCode, string(respBodyBytes))
+			}
 		}
 	}
 
